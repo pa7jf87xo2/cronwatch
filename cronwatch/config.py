@@ -1,52 +1,52 @@
-"""Load and validate cronwatch configuration from a YAML file."""
+"""Configuration loading for cronwatch."""
 
+from __future__ import annotations
+
+import tomllib
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from cronwatch.schedule import CronJob
-
-DEFAULT_GRACE_PERIOD = 60
+from cronwatch.notifiers import get_handler
+from cronwatch.alerting import AlertHandler
 
 
 def _parse_job(raw: dict[str, Any]) -> CronJob:
-    """Convert a raw config dict into a CronJob instance."""
-    required = {"name", "schedule"}
-    missing = required - raw.keys()
-    if missing:
-        raise ValueError(f"Job config missing required fields: {missing}")
-
+    """Build a CronJob from a raw config mapping."""
     return CronJob(
         name=raw["name"],
         schedule=raw["schedule"],
-        grace_period_seconds=int(raw.get("grace_period_seconds", DEFAULT_GRACE_PERIOD)),
-        tags=list(raw.get("tags", [])),
+        warning_threshold=raw.get("warning_threshold", 300),
+        critical_threshold=raw.get("critical_threshold", 900),
+        last_run_at=raw.get("last_run_at"),
     )
 
 
-def load_config(path: str | Path) -> list[CronJob]:
-    """Parse *path* (YAML) and return a list of configured CronJob objects.
+def _parse_notifier(raw: dict[str, Any]) -> AlertHandler:
+    """Build an AlertHandler from a raw notifier config mapping."""
+    raw = dict(raw)  # copy so we can mutate
+    kind = raw.pop("type")
+    return get_handler(kind, **raw)
 
-    Expected format::
 
-        jobs:
-          - name: backup
-            schedule: "0 2 * * *"
-            grace_period_seconds: 300
-            tags: [infra]
-          - name: report
-            schedule: "0 8 * * 1-5"
+def load_config(path: str | Path) -> tuple[list[CronJob], list[AlertHandler]]:
+    """Load jobs and notifiers from a TOML config file.
+
+    Returns a tuple of (jobs, handlers).
     """
     path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
+    with path.open("rb") as fh:
+        data = tomllib.load(fh)
 
-    with path.open() as fh:
-        data = yaml.safe_load(fh) or {}
+    jobs = [_parse_job(j) for j in data.get("jobs", [])]
 
-    raw_jobs = data.get("jobs", [])
-    if not isinstance(raw_jobs, list):
-        raise ValueError("'jobs' must be a list in the config file.")
+    handlers: list[AlertHandler] = []
+    for raw_notifier in data.get("notifiers", []):
+        handlers.append(_parse_notifier(raw_notifier))
 
-    return [_parse_job(j) for j in raw_jobs]
+    if not handlers:
+        # Fall back to stdout if nothing is configured
+        from cronwatch.notifiers.stdout import StdoutAlertHandler
+        handlers.append(StdoutAlertHandler())
+
+    return jobs, handlers
