@@ -58,5 +58,9 @@ class WebhookAlertHandler(AlertHandler):
                     raise RuntimeError(
                         f"Webhook returned non-2xx status: {resp.status}"
                     )
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(
+                f"Webhook returned non-2xx status: {exc.code} {exc.reason}"
+            ) from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(f"Webhook request failed: {exc.reason}") from exc
