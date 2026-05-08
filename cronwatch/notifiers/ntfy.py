@@ -32,7 +32,8 @@ class NtfyAlertHandler(AlertHandler):
             AlertLevel.CRITICAL.value: "urgent",
         }
 
-    def send(self, alert: Alert) -> None:
+    def _build_request(self, alert: Alert) -> urllib.request.Request:
+        """Build the HTTP request for the given alert."""
         url = f"{self.server}/{self.topic}"
         priority = self._priority_map.get(alert.level.value, "default")
         payload = json.dumps(
@@ -53,7 +54,11 @@ class NtfyAlertHandler(AlertHandler):
         )
         if self.token:
             req.add_header("Authorization", f"Bearer {self.token}")
+        return req
 
+    def send(self, alert: Alert) -> None:
+        """Send an alert as a push notification via ntfy."""
+        req = self._build_request(alert)
         try:
             with urllib.request.urlopen(req) as resp:  # noqa: S310
                 if resp.status not in (200, 201):
