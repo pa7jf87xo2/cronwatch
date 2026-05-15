@@ -1,4 +1,4 @@
-"""Notifier registry for cronwatch."""
+"""Notifier registry – maps type strings to handler classes."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from typing import Any
 from cronwatch.alerting import AlertHandler
 
 
-def get_handler(cfg: dict[str, Any]) -> AlertHandler:  # noqa: C901
-    """Instantiate and return the correct AlertHandler from a config dict."""
+def get_handler(cfg: dict[str, Any]) -> AlertHandler:
+    """Instantiate the correct AlertHandler from a notifier config dict."""
     kind = cfg.get("type", "").lower()
 
     if kind == "stdout":
@@ -17,7 +17,10 @@ def get_handler(cfg: dict[str, Any]) -> AlertHandler:  # noqa: C901
 
     if kind == "slack":
         from cronwatch.notifiers.slack import SlackAlertHandler
-        return SlackAlertHandler(webhook_url=cfg["webhook_url"])
+        return SlackAlertHandler(
+            webhook_url=cfg["webhook_url"],
+            channel=cfg.get("channel", ""),
+        )
 
     if kind == "email":
         from cronwatch.notifiers.email import EmailAlertHandler
@@ -26,9 +29,9 @@ def get_handler(cfg: dict[str, Any]) -> AlertHandler:  # noqa: C901
             port=int(cfg.get("port", 587)),
             username=cfg["username"],
             password=cfg["password"],
-            from_addr=cfg["from"],
-            to_addrs=cfg["to"],
-            use_tls=cfg.get("use_tls", True),
+            from_addr=cfg["from_addr"],
+            to_addrs=cfg["to_addrs"],
+            use_tls=bool(cfg.get("use_tls", True)),
         )
 
     if kind == "webhook":
@@ -57,7 +60,7 @@ def get_handler(cfg: dict[str, Any]) -> AlertHandler:  # noqa: C901
 
     if kind == "victorops":
         from cronwatch.notifiers.victorops import VictorOpsAlertHandler
-        return VictorOpsAlertHandler(endpoint=cfg["endpoint"])
+        return VictorOpsAlertHandler(endpoint_url=cfg["endpoint_url"])
 
     if kind == "teams":
         from cronwatch.notifiers.teams import TeamsAlertHandler
@@ -89,6 +92,7 @@ def get_handler(cfg: dict[str, Any]) -> AlertHandler:  # noqa: C901
         return NtfyAlertHandler(
             topic=cfg["topic"],
             server=cfg.get("server", "https://ntfy.sh"),
+            token=cfg.get("token", ""),
         )
 
     if kind == "matrix":
@@ -122,6 +126,76 @@ def get_handler(cfg: dict[str, Any]) -> AlertHandler:  # noqa: C901
             api_token=cfg["api_token"],
             from_number=cfg["from_number"],
             to_number=cfg["to_number"],
+        )
+
+    if kind == "zulip":
+        from cronwatch.notifiers.zulip import ZulipAlertHandler
+        return ZulipAlertHandler(
+            site=cfg["site"],
+            email=cfg["email"],
+            api_key=cfg["api_key"],
+            stream=cfg["stream"],
+            topic=cfg.get("topic", "cronwatch"),
+        )
+
+    if kind == "datadog":
+        from cronwatch.notifiers.datadog import DatadogAlertHandler
+        return DatadogAlertHandler(
+            api_key=cfg["api_key"],
+            tags=cfg.get("tags", []),
+        )
+
+    if kind == "grafana":
+        from cronwatch.notifiers.grafana import GrafanaAlertHandler
+        return GrafanaAlertHandler(
+            url=cfg["url"],
+            api_key=cfg["api_key"],
+        )
+
+    if kind == "splunk":
+        from cronwatch.notifiers.splunk import SplunkAlertHandler
+        return SplunkAlertHandler(
+            hec_url=cfg["hec_url"],
+            hec_token=cfg["hec_token"],
+            index=cfg.get("index", "main"),
+        )
+
+    if kind == "sns":
+        from cronwatch.notifiers.sns import SNSAlertHandler
+        return SNSAlertHandler(
+            topic_arn=cfg["topic_arn"],
+            region=cfg.get("region", "us-east-1"),
+            aws_access_key_id=cfg.get("aws_access_key_id", ""),
+            aws_secret_access_key=cfg.get("aws_secret_access_key", ""),
+        )
+
+    if kind == "hipchat":
+        from cronwatch.notifiers.hipchat import HipChatAlertHandler
+        return HipChatAlertHandler(
+            token=cfg["token"],
+            room_id=cfg["room_id"],
+        )
+
+    if kind == "googlechat":
+        from cronwatch.notifiers.googlechat import GoogleChatAlertHandler
+        return GoogleChatAlertHandler(webhook_url=cfg["webhook_url"])
+
+    if kind == "linear":
+        from cronwatch.notifiers.linear import LinearAlertHandler
+        return LinearAlertHandler(
+            api_key=cfg["api_key"],
+            team_id=cfg["team_id"],
+            label_ids=cfg.get("label_ids", []),
+        )
+
+    if kind == "jira":
+        from cronwatch.notifiers.jira import JiraAlertHandler
+        return JiraAlertHandler(
+            base_url=cfg["base_url"],
+            email=cfg["email"],
+            api_token=cfg["api_token"],
+            project_key=cfg["project_key"],
+            issue_type=cfg.get("issue_type", "Bug"),
         )
 
     raise ValueError(f"Unknown notifier type: {kind!r}")
